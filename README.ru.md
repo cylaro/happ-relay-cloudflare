@@ -52,14 +52,24 @@
 
 ### Шаг 2 — Разберите свою ссылку подписки
 
-Ссылка делится на две части:
+Два способа указать релею на панель:
+
+**Способ 1 — короткий токен.** Ссылка делится на две части и задаётся переменными:
 
 ```
 https://panel-provider.com/sub/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
 └────────── PANEL_BASE ──────────┘ └──────────── TOKEN ────────────┘
 ```
 
-`PANEL_BASE` вы вставите в воркер, `TOKEN` — в ссылки для устройств.
+`PANEL_BASE` идёт в переменные воркера, `TOKEN` — в ссылки для устройств.
+
+**Способ 2 — полный URL в ссылке.** Без `PANEL_BASE`: вставьте весь адрес панели прямо в ссылку для устройств:
+
+```
+https://your-worker.workers.dev/<secret>/s/https://panel-provider.com/sub/6f9a2b1c-...
+```
+
+Так работает любая https-панель (ограничить домены можно переменной `ALLOWED_HOSTS`, если планируете делиться ссылкой).
 
 ### Шаг 3 — Выберите идентичность устройства
 
@@ -84,10 +94,10 @@ https://panel-provider.com/sub/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
 
 | Имя | Значение |
 |---|---|
-| `PANEL_BASE` | `https://panel-provider.com/sub` |
 | `HWID` | `UE42LJXu4DbiCaBv` |
 | `USER_AGENT` | `Happ/1.16.0 (iOS 18.3; iPhone 14 Pro)` |
 | `SECRET_PREFIX` | случайное слово, например `hX7kQ2mV` |
+| `PANEL_BASE` | `https://panel-provider.com/sub` (опционально — не нужен для полных URL) |
 | `DEVICE_OS` | `iOS` |
 | `VER_OS` | `18.3` |
 | `DEVICE_MODEL` | `iPhone 14 Pro` |

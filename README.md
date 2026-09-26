@@ -52,14 +52,24 @@ You now have a worker at `https://hwid-relay.<your-subdomain>.workers.dev`.
 
 ### Step 2 — Understand your subscription link
 
-Split your link into two parts:
+Two ways to point the relay at your panel:
+
+**Way 1 — bare token.** Split your link into two parts and set them as variables:
 
 ```
 https://panel-provider.com/sub/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
 └────────── PANEL_BASE ──────────┘ └──────────── TOKEN ────────────┘
 ```
 
-You will paste `PANEL_BASE` into the worker and `TOKEN` into every device link later.
+`PANEL_BASE` goes into the worker variables, `TOKEN` goes into every device link later.
+
+**Way 2 — full URL in the link.** Skip `PANEL_BASE` entirely: paste the whole panel URL into the device link:
+
+```
+https://your-worker.workers.dev/<secret>/s/https://panel-provider.com/sub/6f9a2b1c-...
+```
+
+Any https panel works this way (restrict hosts with `ALLOWED_HOSTS` if you plan to share the link).
 
 ### Step 3 — Choose the device identity
 
@@ -84,10 +94,10 @@ In the Cloudflare dashboard:
 
 | Name | Value |
 |---|---|
-| `PANEL_BASE` | `https://panel-provider.com/sub` |
 | `HWID` | `UE42LJXu4DbiCaBv` |
 | `USER_AGENT` | `Happ/1.16.0 (iOS 18.3; iPhone 14 Pro)` |
 | `SECRET_PREFIX` | a random word, e.g. `hX7kQ2mV` |
+| `PANEL_BASE` | `https://panel-provider.com/sub` (optional — skip if you use full-URL links) |
 | `DEVICE_OS` | `iOS` |
 | `VER_OS` | `18.3` |
 | `DEVICE_MODEL` | `iPhone 14 Pro` |

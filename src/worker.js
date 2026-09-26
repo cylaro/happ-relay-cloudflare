@@ -1,10 +1,16 @@
-import { matchRoute, buildUpstreamUrl, identityHeaders, filterResponseHeaders, validateEnv } from './core.js';
+import {
+  matchRoute,
+  resolveTarget,
+  identityHeaders,
+  filterResponseHeaders,
+  validateEnv,
+} from './core.js';
 
 function healthResponse(env) {
   const { ok, missing } = validateEnv(env);
   const body = JSON.stringify(
     ok
-      ? { status: 'ok', hint: 'subscription URL: <worker>/SECRET_PREFIX/s/<token>' }
+      ? { status: 'ok', hint: 'subscription URL: <worker>/SECRET_PREFIX/s/<token-or-panel-url>' }
       : { status: 'misconfigured', missing },
   );
   return new Response(body, { status: ok ? 200 : 500, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
@@ -20,7 +26,14 @@ export default {
     const { ok, missing } = validateEnv(env);
     if (!ok) return new Response(`Configuration error: missing ${missing[0]}`, { status: 500 });
 
-    const upstream = await fetch(buildUpstreamUrl(env, route.tokenPath), {
+    let target;
+    try {
+      target = resolveTarget(env, route.tokenPath);
+    } catch (e) {
+      return new Response(e.message, { status: e.status || 400 });
+    }
+
+    const upstream = await fetch(target, {
       headers: identityHeaders(env),
       redirect: 'follow',
     });

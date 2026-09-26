@@ -84,12 +84,21 @@ export function matchRoute(pathname, env) {
 
 /**
  * Resolve the token path to an upstream URL.
- * The token path must be a full https URL of the panel subscription endpoint;
- * the host must pass ALLOWED_HOSTS if the allowlist is set.
+ * The token path points to the panel subscription endpoint:
+ *   full https URL (single or doubled slashes are tolerated)
+ *   or scheme-less host/path (https:// is assumed)
+ * The host must pass ALLOWED_HOSTS if the allowlist is set.
  */
 export function resolveTarget(env, tokenPath) {
-  const raw = String(tokenPath || '').replace(/^\/+/, '');
-  if (!/^https:\/\//i.test(raw)) throw err('token must be a full https panel URL');
+  let raw = String(tokenPath || '').trim().replace(/^\/+/, '');
+  // Apps and CDNs sometimes collapse "https://" into "https:/": restore it.
+  raw = raw.replace(/^(https?):\/{1,}/i, '$1://');
+  if (/^happ:\/\//i.test(raw)) throw err('this is an encrypted happ link — decrypt it first');
+  if (!/^https:\/\//i.test(raw)) {
+    // Scheme-less host/path: assume https.
+    if (/^[a-z0-9.-]+\.[a-z]{2,}([/?#]|$)/i.test(raw)) raw = 'https://' + raw;
+    else throw err('token must be a full https panel URL');
+  }
 
   let url;
   try {

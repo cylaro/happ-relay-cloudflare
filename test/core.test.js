@@ -71,8 +71,13 @@ test('resolveTarget: full https URL is used as-is', () => {
   assert.equal(resolveTarget(ENV, 'https://other.example.com/sub/t'), 'https://other.example.com/sub/t');
 });
 
+test('resolveTarget: collapsed and scheme-less URLs are normalized to https', () => {
+  assert.equal(resolveTarget(ENV, 'https:/other.example.com/sub/t'), 'https://other.example.com/sub/t');
+  assert.equal(resolveTarget(ENV, 'other.example.com/sub/t'), 'https://other.example.com/sub/t');
+});
+
 test('resolveTarget: bare tokens are rejected — a full panel URL is required', () => {
-  assert.throws(() => resolveTarget(ENV, 'panel.example.com/sub/t'), /full https panel URL/);
+  assert.throws(() => resolveTarget(ENV, 't'), /full https panel URL/);
 });
 
 test('resolveTarget: rejects http targets and disallowed hosts', () => {
@@ -87,6 +92,10 @@ test('resolveTarget: rejects http targets and disallowed hosts', () => {
 
 test('resolveTarget: rejects credentials inside the target URL', () => {
   assert.throws(() => resolveTarget(ENV, 'https://user:pass@panel.example.com/sub/t'), /credentials/);
+});
+
+test('resolveTarget: happ links get a clear hint', () => {
+  assert.throws(() => resolveTarget(ENV, 'happ://crypt5/xyz'), /decrypt it first/);
 });
 
 test('hostAllowed: empty allowlist permits everything; subdomains match their root', () => {

@@ -18,16 +18,7 @@
 
 Релей меняет точку подключения приложений:
 
-```
-Телефон 1 (Happ) ─┐
-Телефон 2 (Happ) ─┤   https://your-worker.workers.dev/<secret>/s/<token>
-Телефон 10     ─┘              │
-                               ▼   фиксированная идентичность: ОДИН x-hwid, ОДИН User-Agent
-                      Ваш Cloudflare Worker
-                               │
-                               ▼
-                    Панель  ──>  видит ровно ОДНО устройство
-```
+![Архитектура hwid-relay: много устройств — один HWID на панели](docs/architecture.svg)
 
 ---
 
@@ -177,6 +168,14 @@ npx wrangler dev    # локальный запуск воркера
 
 - [happ-decryptor](https://github.com/cylaro/happ-decryptor) — расшифровка `happ://crypt…`-ссылок, редактирование URL, запросы с заголовками устройства.
 - [happ-relay-vercel](https://github.com/cylaro/happ-relay-vercel) — тот же релей «много устройств — один HWID» на Vercel, через serverless-функцию.
+
+## Поддержать / Donate
+
+Если проект был полезен — можно поддержать разработку, **USDT в сети TON**:
+
+```text
+UQCcN9hahBxM5q3GGwx79UNEu82EF0kFTwnRRklL_1OLtK15
+```
 
 ## Лицензия
 

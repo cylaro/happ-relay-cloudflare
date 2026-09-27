@@ -18,16 +18,7 @@ Panels like [Remnawave](https://docs.rw/features/hwid-device-limit) count unique
 
 The relay changes where your apps connect:
 
-```
-Phone 1 (Happ) ─┐
-Phone 2 (Happ) ─┤   https://your-worker.workers.dev/<secret>/s/<token>
-Phone 10     ─┘              │
-                             ▼   fixed identity: ONE x-hwid, ONE User-Agent
-                    Your Cloudflare Worker
-                             │
-                             ▼
-                  Panel  ──>  sees exactly ONE device
-```
+![hwid-relay architecture: many devices — one HWID at the panel](docs/architecture.svg)
 
 ---
 
@@ -177,6 +168,14 @@ This project is provided for **educational purposes** — it demonstrates how HW
 
 - [happ-decryptor](https://github.com/cylaro/happ-decryptor) — decrypt `happ://crypt…` links, edit subscription URLs, send requests with device headers.
 - [happ-relay-vercel](https://github.com/cylaro/happ-relay-vercel) — the same one-HWID relay on Vercel, with a serverless function instead of a Worker.
+
+## Support / Donate
+
+If this project helped you, consider a donation — **USDT on the TON network**:
+
+```text
+UQCcN9hahBxM5q3GGwx79UNEu82EF0kFTwnRRklL_1OLtK15
+```
 
 ## License
 

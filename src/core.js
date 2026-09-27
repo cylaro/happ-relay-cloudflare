@@ -61,6 +61,16 @@ function normalizedPrefix(env) {
   return '/' + String(env?.SECRET_PREFIX || '').replace(/^\/+|\/+$/g, '');
 }
 
+/** Length-safe constant-time string comparison (length itself is public — it is in the URL). */
+export function safeEqual(a, b) {
+  const A = new TextEncoder().encode(String(a));
+  const B = new TextEncoder().encode(String(b));
+  if (A.length !== B.length) return false;
+  let diff = 0;
+  for (let i = 0; i < A.length; i++) diff |= A[i] ^ B[i];
+  return diff === 0;
+}
+
 /**
  * Route a request path:
  *   /<prefix>/health        -> { route: 'health' }
@@ -72,10 +82,10 @@ function normalizedPrefix(env) {
  */
 export function matchRoute(pathname, env) {
   const prefix = normalizedPrefix(env);
-  if (prefix === '/' || pathname.length > 2048) return { route: 'not-found' };
-  if (pathname === `${prefix}/health`) return { route: 'health' };
+  if (prefix === '/' || pathname.length > 2048 || !env?.SECRET_PREFIX) return { route: 'not-found' };
+  if (safeEqual(pathname, `${prefix}/health`)) return { route: 'health' };
   const subscriptionPrefix = `${prefix}/s/`;
-  if (pathname.startsWith(subscriptionPrefix) && pathname.length > subscriptionPrefix.length) {
+  if (safeEqual(pathname.slice(0, subscriptionPrefix.length), subscriptionPrefix) && pathname.length > subscriptionPrefix.length) {
     const tokenPath = pathname.slice(subscriptionPrefix.length).replace(/^\/+/, '');
     if (tokenPath && !/\s/.test(tokenPath)) return { route: 'subscription', tokenPath };
   }

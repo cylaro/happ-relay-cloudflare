@@ -50,26 +50,16 @@ You need:
 
 You now have a worker at `https://hwid-relay.<your-subdomain>.workers.dev`.
 
-### Step 2 — Understand your subscription link
+### Step 2 — Build your device link
 
-Two ways to point the relay at your panel:
-
-**Way 1 — bare token.** Split your link into two parts and set them as variables:
+The device link is the worker URL + your secret + the **full panel URL**:
 
 ```
-https://panel-provider.com/sub/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
-└────────── PANEL_BASE ──────────┘ └──────────── TOKEN ────────────┘
+https://your-worker.workers.dev/<secret>/s/https://panel-provider.com/sub/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
+                                └────────────── secret ──────────────┘ └──────────────── panel URL ────────────────┘
 ```
 
-`PANEL_BASE` goes into the worker variables, `TOKEN` goes into every device link later.
-
-**Way 2 — full URL in the link.** Skip `PANEL_BASE` entirely: paste the whole panel URL into the device link:
-
-```
-https://your-worker.workers.dev/<secret>/s/https://panel-provider.com/sub/6f9a2b1c-...
-```
-
-Any https panel works this way (restrict hosts with `ALLOWED_HOSTS` if you plan to share the link).
+Swap the panel URL for any other panel — the relay fetches it with your fixed identity. Hosts can be restricted with the `ALLOWED_HOSTS` variable if you plan to share the link.
 
 ### Step 3 — Choose the device identity
 
@@ -97,7 +87,6 @@ In the Cloudflare dashboard:
 | `HWID` | `UE42LJXu4DbiCaBv` |
 | `USER_AGENT` | `Happ/1.16.0 (iOS 18.3; iPhone 14 Pro)` |
 | `SECRET_PREFIX` | a random word, e.g. `hX7kQ2mV` |
-| `PANEL_BASE` | `https://panel-provider.com/sub` (optional — skip if you use full-URL links) |
 | `DEVICE_OS` | `iOS` |
 | `VER_OS` | `18.3` |
 | `DEVICE_MODEL` | `iPhone 14 Pro` |
@@ -162,7 +151,7 @@ That's it. Update the subscription on every device — the panel still shows one
 |---|---|---|
 | `/health` returns `{"status":"misconfigured","missing":[...]}` | A variable is missing or invalid | Fix the listed variable in Step 4 |
 | Subscription opens, but `x-hwid-max-devices-reached: true` in response headers | The limit is already used by earlier devices | Delete old devices in the panel user card, or ask the owner to raise the limit |
-| Panel returns 404 or empty body | Wrong `PANEL_BASE`/token, the provider blocks Cloudflare IPs, or the panel requires an identity you did not configure | Open the original panel URL in a browser; if it works there, re-check your variables; if the provider blocks datacenter IPs, a relay on Cloudflare cannot help |
+| Panel returns 404 or empty body | Wrong token, the provider blocks Cloudflare IPs, or the panel requires an identity you did not configure | Open the original panel URL in a browser; if it works there, re-check your variables; if the provider blocks datacenter IPs, a relay on Cloudflare cannot help |
 | `Not Found` from the worker | Wrong path or wrong `SECRET_PREFIX` | Use exactly `<worker>/<SECRET_PREFIX>/s/<token>` |
 | Apps show no traffic quota | Panel does not send `subscription-userinfo` | Panel-side; not a relay issue |
 
@@ -170,7 +159,8 @@ That's it. Update the subscription on every device — the panel still shows one
 
 - The panel sees one device whose requests come from Cloudflare IP ranges at a high frequency. A provider can notice this in server logs; using it against your plan's terms is your decision.
 - If the provider blocks datacenter IPs, this relay cannot help — no free public service can fix that.
-- One worker = one panel + one identity. Several panels → deploy the worker several times.
+- One worker = one panel + one identity. Several panels → deploy the worker several times (or use full panel URLs in the links — hosts can be restricted with `ALLOWED_HOSTS`).
+- Responses over 2 MiB (by Content-Length) are rejected; upstream requests time out after 15 seconds.
 
 ## Development
 

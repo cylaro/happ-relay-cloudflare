@@ -33,10 +33,22 @@ export default {
       return new Response(e.message, { status: e.status || 400 });
     }
 
-    const upstream = await fetch(target, {
-      headers: identityHeaders(env),
-      redirect: 'follow',
-    });
+    const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+    let upstream;
+    try {
+      upstream = await fetch(target, {
+        headers: identityHeaders(env),
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch (e) {
+      return new Response('upstream timeout or network error', { status: 504 });
+    }
+    const declaredLength = Number(upstream.headers.get('content-length') || 0);
+    if (declaredLength > MAX_RESPONSE_BYTES) {
+      return new Response('upstream response too large', { status: 502 });
+    }
+
     return new Response(upstream.body, { status: upstream.status, headers: filterResponseHeaders(upstream.headers) });
   },
 };

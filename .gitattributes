@@ -1,0 +1,6 @@
+# Normalize line endings
+* text=auto
+
+# Binaries
+*.png binary
+*.svg text

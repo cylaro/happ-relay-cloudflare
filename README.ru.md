@@ -167,7 +167,7 @@ npx wrangler dev    # локальный запуск воркера
 ## Связанные проекты
 
 - [happ-decryptor](https://github.com/cylaro/happ-decryptor) — расшифровка `happ://crypt…`-ссылок, редактирование URL, запросы с заголовками устройства.
-- [happ-relay-vercel](https://github.com/cylaro/happ-relay-vercel) — тот же релей «много устройств — один HWID» на Vercel, через serverless-функцию.
+- [hwid-relay-vercel](https://github.com/cylaro/hwid-relay-vercel) — тот же релей «много устройств — один HWID» на Vercel, через serverless-функцию.
 
 ## Поддержать / Donate
 

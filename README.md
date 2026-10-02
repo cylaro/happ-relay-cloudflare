@@ -167,7 +167,7 @@ This project is provided for **educational purposes** — it demonstrates how HW
 ## Related projects
 
 - [happ-decryptor](https://github.com/cylaro/happ-decryptor) — decrypt `happ://crypt…` links, edit subscription URLs, send requests with device headers.
-- [happ-relay-vercel](https://github.com/cylaro/happ-relay-vercel) — the same one-HWID relay on Vercel, with a serverless function instead of a Worker.
+- [hwid-relay-vercel](https://github.com/cylaro/hwid-relay-vercel) — the same one-HWID relay on Vercel, with a serverless function instead of a Worker.
 
 ## Support / Donate
 

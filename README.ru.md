@@ -30,7 +30,7 @@
 
 1. **Ваша текущая ссылка подписки** — адрес панели с личным токеном, например:
    `https://panel-provider.com/sub/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f`
-   Если есть только зашифрованная ссылка `happ://crypt5/...` — сначала расшифруйте её через [happ-decryptor](https://github.com/cylaro/happ-decryptor).
+   Если есть только зашифрованная ссылка `happ://crypt5/...` — сначала расшифруйте её через [happ-decryptor](https://github.com/cylaro/happ-decrypt).
 2. **Бесплатный аккаунт Cloudflare** — [dash.cloudflare.com](https://dash.cloudflare.com) → Sign up. Карта не нужна.
 3. **5 минут.**
 
@@ -64,7 +64,7 @@ https://your-worker.workers.dev/<secret>/s/https://panel-provider.com/sub/6f9a2b
 | `VER_OS` | версия ОС | `18.3` |
 | `DEVICE_MODEL` | название устройства | `iPhone 14 Pro` |
 
-Случайный корректный HWID генерирует редактор [happ-decryptor](https://github.com/cylaro/happ-decryptor) (кнопка `+ HWID`). Выбрав значения, **больше их не меняйте** — панель помнит устройство по ним.
+Случайный корректный HWID генерирует редактор [happ-decryptor](https://github.com/cylaro/happ-decrypt) (кнопка `+ HWID`). Выбрав значения, **больше их не меняйте** — панель помнит устройство по ним.
 
 ### Шаг 4 — Задайте переменные воркера
 
@@ -112,7 +112,7 @@ https://happ-relay-cloudflare.<ваш-поддомен>.workers.dev/hX7kQ2mV/s/6
 
 Загляните также в карточку пользователя на панели (сайт или мини-приложение провайдера): в списке устройств должно появиться **одно устройство** с вашим `DEVICE_MODEL`.
 
-Альтернативная проверка: [happ-decryptor](https://github.com/cylaro/happ-decryptor) → вкладка Request → отправьте URL панели с теми же значениями и посмотрите заголовки ответа.
+Альтернативная проверка: [happ-decryptor](https://github.com/cylaro/happ-decrypt) → вкладка Request → отправьте URL панели с теми же значениями и посмотрите заголовки ответа.
 
 ### Шаг 7 — Подключите устройства
 
@@ -166,7 +166,7 @@ npx wrangler dev    # локальный запуск воркера
 
 ## Связанные проекты
 
-- [happ-decryptor](https://github.com/cylaro/happ-decryptor) — расшифровка `happ://crypt…`-ссылок, редактирование URL, запросы с заголовками устройства.
+- [happ-decryptor](https://github.com/cylaro/happ-decrypt) — расшифровка `happ://crypt…`-ссылок, редактирование URL, запросы с заголовками устройства.
 - [happ-relay-cloudflare-vercel](https://github.com/cylaro/happ-relay-cloudflare-vercel) — тот же релей «много устройств — один HWID» на Vercel, через serverless-функцию.
 
 ## Поддержать / Donate

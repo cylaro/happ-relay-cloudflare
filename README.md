@@ -30,7 +30,7 @@ You need:
 
 1. **Your current subscription link** — the panel URL with your personal token, for example:
    `https://panel-provider.com/sub/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f`
-   If you only have an encrypted `happ://crypt5/...` link, decrypt it first with [happ-decryptor](https://github.com/cylaro/happ-decryptor).
+   If you only have an encrypted `happ://crypt5/...` link, decrypt it first with [happ-decryptor](https://github.com/cylaro/happ-decrypt).
 2. **A free Cloudflare account** — [dash.cloudflare.com](https://dash.cloudflare.com) → Sign up. No card required.
 3. **5 minutes.**
 
@@ -64,7 +64,7 @@ These values are what the panel will see as "the device":
 | `VER_OS` | OS version | `18.3` |
 | `DEVICE_MODEL` | device name | `iPhone 14 Pro` |
 
-You can generate a random valid HWID with the [happ-decryptor](https://github.com/cylaro/happ-decryptor) editor (`+ HWID` button). Once chosen, keep these values **the same forever** — the panel remembers the device by them.
+You can generate a random valid HWID with the [happ-decryptor](https://github.com/cylaro/happ-decrypt) editor (`+ HWID` button). Once chosen, keep these values **the same forever** — the panel remembers the device by them.
 
 ### Step 4 — Set the worker variables
 
@@ -112,7 +112,7 @@ You should see the subscription content (a text list of `vless://...` lines, Bas
 
 Also check the panel user card (your provider's website or mini-app): the device list should now show **one device** with your `DEVICE_MODEL`.
 
-Alternative check: [happ-decryptor](https://github.com/cylaro/happ-decryptor) → Request tab → send the panel URL with the same values and inspect the response headers.
+Alternative check: [happ-decryptor](https://github.com/cylaro/happ-decrypt) → Request tab → send the panel URL with the same values and inspect the response headers.
 
 ### Step 7 — Connect your devices
 
@@ -166,7 +166,7 @@ This project is provided for **educational purposes** — it demonstrates how HW
 
 ## Related projects
 
-- [happ-decryptor](https://github.com/cylaro/happ-decryptor) — decrypt `happ://crypt…` links, edit subscription URLs, send requests with device headers.
+- [happ-decryptor](https://github.com/cylaro/happ-decrypt) — decrypt `happ://crypt…` links, edit subscription URLs, send requests with device headers.
 - [happ-relay-cloudflare-vercel](https://github.com/cylaro/happ-relay-cloudflare-vercel) — the same one-HWID relay on Vercel, with a serverless function instead of a Worker.
 
 ## Support / Donate

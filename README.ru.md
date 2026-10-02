@@ -1,7 +1,7 @@
-# hwid-relay
+# happ-relay-cloudflare
 
-[![Tests](https://github.com/cylaro/hwid-relay/actions/workflows/test.yml/badge.svg)](https://github.com/cylaro/hwid-relay/actions/workflows/test.yml)
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cylaro/hwid-relay)
+[![Tests](https://github.com/cylaro/happ-relay-cloudflare/actions/workflows/test.yml/badge.svg)](https://github.com/cylaro/happ-relay-cloudflare/actions/workflows/test.yml)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cylaro/happ-relay-cloudflare)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Подключайте сколько угодно устройств к панели с лимитом HWID — все они будут считаться одним устройством.**
@@ -18,7 +18,7 @@
 
 Релей меняет точку подключения приложений:
 
-![Архитектура hwid-relay: много устройств — один HWID на панели](docs/architecture.svg)
+![Архитектура happ-relay-cloudflare: много устройств — один HWID на панели](docs/architecture.svg)
 
 ---
 
@@ -37,9 +37,9 @@
 ### Шаг 1 — Разверните воркер
 
 1. Нажмите кнопку **Deploy to Cloudflare** выше (или создайте воркер вручную: dash.cloudflare.com → **Workers & Pages** → **Create** → **Create Worker**).
-2. Задайте имя, например `hwid-relay`, и завершите деплой.
+2. Задайте имя, например `happ-relay-cloudflare`, и завершите деплой.
 
-Теперь у вас есть воркер по адресу `https://hwid-relay.<ваш-поддомен>.workers.dev`.
+Теперь у вас есть воркер по адресу `https://happ-relay-cloudflare.<ваш-поддомен>.workers.dev`.
 
 ### Шаг 2 — Соберите ссылку для устройств
 
@@ -70,7 +70,7 @@ https://your-worker.workers.dev/<secret>/s/https://panel-provider.com/sub/6f9a2b
 
 В панели Cloudflare:
 
-1. **Workers & Pages** → `hwid-relay` → **Settings** → **Variables and Secrets**.
+1. **Workers & Pages** → `happ-relay-cloudflare` → **Settings** → **Variables and Secrets**.
 2. Добавьте каждую переменную ниже с типом **Text** и в конце нажмите **Deploy**:
 
 | Имя | Значение |
@@ -89,7 +89,7 @@ https://your-worker.workers.dev/<secret>/s/https://panel-provider.com/sub/6f9a2b
 Откройте:
 
 ```
-https://hwid-relay.<ваш-поддомен>.workers.dev/hX7kQ2mV/health
+https://happ-relay-cloudflare.<ваш-поддомен>.workers.dev/hX7kQ2mV/health
 ```
 
 Ожидаемый ответ:
@@ -105,7 +105,7 @@ https://hwid-relay.<ваш-поддомен>.workers.dev/hX7kQ2mV/health
 Откройте в браузере:
 
 ```
-https://hwid-relay.<ваш-поддомен>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
+https://happ-relay-cloudflare.<ваш-поддомен>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
 ```
 
 Вы должны увидеть содержимое подписки (текстовый список `vless://...`, Base64 или подобное). Это доказательство, что панель приняла ваш HWID — релей всегда отправляет именно эти заголовки.
@@ -119,7 +119,7 @@ https://hwid-relay.<ваш-поддомен>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7
 В каждом приложении (Happ, v2RayTun, …) добавьте подписку по URL:
 
 ```
-https://hwid-relay.<ваш-поддомен>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
+https://happ-relay-cloudflare.<ваш-поддомен>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
 ```
 
 Готово. Обновите подписку на всех устройствах — на панели по-прежнему одно устройство. Отображение трафика тоже работает (`subscription-userinfo` пробрасывается).
@@ -167,7 +167,7 @@ npx wrangler dev    # локальный запуск воркера
 ## Связанные проекты
 
 - [happ-decryptor](https://github.com/cylaro/happ-decryptor) — расшифровка `happ://crypt…`-ссылок, редактирование URL, запросы с заголовками устройства.
-- [hwid-relay-vercel](https://github.com/cylaro/hwid-relay-vercel) — тот же релей «много устройств — один HWID» на Vercel, через serverless-функцию.
+- [happ-relay-cloudflare-vercel](https://github.com/cylaro/happ-relay-cloudflare-vercel) — тот же релей «много устройств — один HWID» на Vercel, через serverless-функцию.
 
 ## Поддержать / Donate
 

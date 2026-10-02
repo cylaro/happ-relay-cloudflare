@@ -1,7 +1,7 @@
-# hwid-relay
+# happ-relay-cloudflare
 
-[![Tests](https://github.com/cylaro/hwid-relay/actions/workflows/test.yml/badge.svg)](https://github.com/cylaro/hwid-relay/actions/workflows/test.yml)
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cylaro/hwid-relay)
+[![Tests](https://github.com/cylaro/happ-relay-cloudflare/actions/workflows/test.yml/badge.svg)](https://github.com/cylaro/happ-relay-cloudflare/actions/workflows/test.yml)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cylaro/happ-relay-cloudflare)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Connect as many devices as you want to a panel with a HWID device limit — they all count as one device.**
@@ -18,7 +18,7 @@ Panels like [Remnawave](https://docs.rw/features/hwid-device-limit) count unique
 
 The relay changes where your apps connect:
 
-![hwid-relay architecture: many devices — one HWID at the panel](docs/architecture.svg)
+![happ-relay-cloudflare architecture: many devices — one HWID at the panel](docs/architecture.svg)
 
 ---
 
@@ -37,9 +37,9 @@ You need:
 ### Step 1 — Deploy the worker
 
 1. Press the **Deploy to Cloudflare** button above (or create a Worker manually: dash.cloudflare.com → **Workers & Pages** → **Create** → **Create Worker**).
-2. Name it, for example `hwid-relay`, and finish the deployment.
+2. Name it, for example `happ-relay-cloudflare`, and finish the deployment.
 
-You now have a worker at `https://hwid-relay.<your-subdomain>.workers.dev`.
+You now have a worker at `https://happ-relay-cloudflare.<your-subdomain>.workers.dev`.
 
 ### Step 2 — Build your device link
 
@@ -70,7 +70,7 @@ You can generate a random valid HWID with the [happ-decryptor](https://github.co
 
 In the Cloudflare dashboard:
 
-1. **Workers & Pages** → `hwid-relay` → **Settings** → **Variables and Secrets**.
+1. **Workers & Pages** → `happ-relay-cloudflare` → **Settings** → **Variables and Secrets**.
 2. Add each variable below with type **Text**, pressing **Deploy** at the end:
 
 | Name | Value |
@@ -89,7 +89,7 @@ Saving variables redeploys the worker automatically.
 Open:
 
 ```
-https://hwid-relay.<your-subdomain>.workers.dev/hX7kQ2mV/health
+https://happ-relay-cloudflare.<your-subdomain>.workers.dev/hX7kQ2mV/health
 ```
 
 Expected answer:
@@ -105,7 +105,7 @@ If you get `{"status":"misconfigured",...}` — the response lists exactly which
 Open in any browser:
 
 ```
-https://hwid-relay.<your-subdomain>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
+https://happ-relay-cloudflare.<your-subdomain>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
 ```
 
 You should see the subscription content (a text list of `vless://...` lines, Base64, or similar). This proves the panel accepted your HWID — the relay always sends exactly these headers.
@@ -119,7 +119,7 @@ Alternative check: [happ-decryptor](https://github.com/cylaro/happ-decryptor) �
 In each app (Happ, v2RayTun, ...): add a subscription by URL:
 
 ```
-https://hwid-relay.<your-subdomain>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
+https://happ-relay-cloudflare.<your-subdomain>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
 ```
 
 That's it. Update the subscription on every device — the panel still shows one device. Traffic quota display works too (`subscription-userinfo` is forwarded).
@@ -167,7 +167,7 @@ This project is provided for **educational purposes** — it demonstrates how HW
 ## Related projects
 
 - [happ-decryptor](https://github.com/cylaro/happ-decryptor) — decrypt `happ://crypt…` links, edit subscription URLs, send requests with device headers.
-- [hwid-relay-vercel](https://github.com/cylaro/hwid-relay-vercel) — the same one-HWID relay on Vercel, with a serverless function instead of a Worker.
+- [happ-relay-cloudflare-vercel](https://github.com/cylaro/happ-relay-cloudflare-vercel) — the same one-HWID relay on Vercel, with a serverless function instead of a Worker.
 
 ## Support / Donate
 

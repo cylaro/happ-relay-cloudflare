@@ -139,7 +139,8 @@ export function filterResponseHeaders(upstreamHeaders) {
   return headers;
 }
 
-const URI_LINE_RE = /^(?:vless|vmess|ss|socks|trojan|hysteria2|hy2):\/\//i;
+const URI_LINE_RE = /^(?:vless|vmess|ss|socks|trojan|hysteria2|hy2|hysteria):\/\//i;
+const PROTOCOLS = new Set(['vless', 'vmess', 'trojan', 'ss', 'socks', 'hysteria', 'hysteria2', 'hy2']);
 
 /** Decode a base64 subscription body if it does not already look like plain URIs. */
 function decodeIfBase64(text) {
@@ -153,11 +154,130 @@ function decodeIfBase64(text) {
   }
 }
 
+/** Recursively collect every outbounds[] entry from parsed JSON (Xray/V2Ray config, possibly wrapped). */
+function collectOutbounds(node, acc) {
+  if (!node || typeof node !== 'object') return acc;
+  if (Array.isArray(node)) {
+    for (const item of node) collectOutbounds(item, acc);
+    return acc;
+  }
+  if (Array.isArray(node.outbounds)) {
+    for (const o of node.outbounds) if (o && typeof o === 'object' && PROTOCOLS.has(String(o.protocol || '').toLowerCase())) acc.push(o);
+  }
+  for (const v of Object.values(node)) collectOutbounds(v, acc);
+  return acc;
+}
+
+function firstServer(outbound) {
+  const s = outbound?.settings || {};
+  return s.vnext?.[0] || s.servers?.[0] || null;
+}
+
+/** Build query params from streamSettings (security, transport, reality/tls details). */
+function streamParams(stream) {
+  const params = new URLSearchParams();
+  const network = String(stream?.network || 'tcp');
+  params.set('type', network);
+  const security = String(stream?.security || '');
+  if (security === 'tls' || security === 'reality') {
+    const conf = stream?.[security + 'Settings'] || {};
+    params.set('security', security);
+    if (conf.serverName) params.set('sni', conf.serverName);
+    if (conf.fingerprint) params.set('fp', conf.fingerprint);
+    if (conf.alpn) params.set('alpn', Array.isArray(conf.alpn) ? conf.alpn.join(',') : conf.alpn);
+    if (conf.publicKey) params.set('pbk', conf.publicKey);
+    if (conf.shortId) params.set('sid', conf.shortId);
+    if (conf.spiderX) params.set('spx', conf.spiderX);
+    if (conf.allowInsecure) params.set('allowInsecure', '1');
+  }
+  const hostOf = h => (Array.isArray(h) ? h.join(',') : String(h));
+  if (network === 'ws' && stream?.wsSettings) {
+    if (stream.wsSettings.path) params.set('path', stream.wsSettings.path);
+    if (stream.wsSettings.headers?.Host) params.set('host', hostOf(stream.wsSettings.headers.Host));
+  }
+  if (network === 'grpc' && stream?.grpcSettings?.serviceName) params.set('serviceName', stream.grpcSettings.serviceName);
+  if (network === 'tcp' && stream?.tcpSettings?.header?.request?.headers?.Host) params.set('host', hostOf(stream.tcpSettings.header.request.headers.Host));
+  if (network === 'http' && stream?.tcpSettings?.header?.request?.path) params.set('path', hostOf(stream.tcpSettings.header.request.path));
+  return params;
+}
+
+/** Convert one Xray/V2Ray outbound into a shareable proxy URI, or null if not representable. */
+export function outboundToUri(outbound) {
+  const protocol = String(outbound?.protocol || '').toLowerCase();
+  const server = firstServer(outbound);
+  if (!server || !server.address || !server.port) return null;
+  const tag = String(outbound.tag || '').replace(/[\r\n\t#?/&]/g, ' ').trim() || 'server';
+  const name = encodeURIComponent(tag);
+  const addr = String(server.address);
+  const port = Number(server.port);
+  const params = streamParams(outbound.streamSettings);
+  const user = server.users?.[0] || {};
+
+  if (protocol === 'vless' && user.id) {
+    if (user.encryption && user.encryption !== 'none') params.set('encryption', user.encryption);
+    if (user.flow) params.set('flow', user.flow);
+    return `vless://${encodeURIComponent(user.id)}@${addr}:${port}?${params}#${name}`;
+  }
+  if (protocol === 'vmess' && user.id) {
+    const vm = {
+      v: '2', ps: tag, add: addr, port: String(port), id: user.id,
+      aid: String(user.alterId ?? 0), scy: user.security || 'auto',
+      net: String(outbound.streamSettings?.network || 'tcp'), type: 'none',
+      host: params.get('host') || '', path: params.get('path') || '',
+      tls: params.get('security') === 'tls' ? 'tls' : '',
+      sni: params.get('sni') || '', fp: params.get('fp') || '',
+    };
+    return `vmess://${btoa(JSON.stringify(vm))}`;
+  }
+  if (protocol === 'trojan' && server.password) {
+    return `trojan://${encodeURIComponent(server.password)}@${addr}:${port}?${params}#${name}`;
+  }
+  if (protocol === 'ss' && server.method && server.password) {
+    return `ss://${btoa(`${server.method}:${server.password}`)}@${addr}:${port}#${name}`;
+  }
+  if (protocol === 'socks') {
+    const u = user.user ? `${encodeURIComponent(user.user)}:${encodeURIComponent(user.pass || '')}@` : '';
+    return `socks://${u}${addr}:${port}#${name}`;
+  }
+  if ((protocol === 'hysteria2' || protocol === 'hy2')) {
+    const pass = encodeURIComponent(outbound.settings?.password || server.password || '');
+    return `hysteria2://${pass ? pass + '@' : ''}${addr}:${port}?${params}#${name}`;
+  }
+  if (protocol === 'hysteria') {
+    const auth = server.password || outbound.settings?.auth_str || '';
+    if (auth) params.set('auth', auth);
+    return `hysteria://${addr}:${port}?${params}#${name}`;
+  }
+  return null;
+}
+
+/** Parse a JSON/Xray subscription body into proxy URIs. Returns [] when the body is not JSON. */
+export function parseJsonSubscription(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start === -1 || end <= start) return [];
+    try {
+      parsed = JSON.parse(trimmed.slice(start, end + 1));
+    } catch {
+      return [];
+    }
+  }
+  return collectOutbounds(parsed, []).map(outboundToUri).filter(Boolean);
+}
+
 /**
  * Extract proxy URIs (vless://, vmess://, ss://, …) from a subscription body:
- * plain text, base64 text, or a mix of both. Order is preserved.
+ * Xray/V2Ray JSON config, plain text, base64 text, or a mix. Order is preserved.
  */
 export function parseSubscriptionUris(text) {
+  const fromJson = parseJsonSubscription(text);
+  if (fromJson.length > 0) return fromJson;
   const body = decodeIfBase64(String(text || '').trim());
   if (!body) return [];
   return body.split(/\r?\n/).map(l => l.trim()).filter(URI_LINE_RE.test.bind(URI_LINE_RE));

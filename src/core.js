@@ -440,17 +440,17 @@ export function serversHtml(servers) {
     <h2>${flagHtml}<span class="num">${escapeHtml(s.index)}.</span> ${escapeHtml(s.name)}</h2>
     <code>${escapeHtml(s.uri)}</code>
     <div class="actions">
-      <a href="${escapeHtml(s.uri)}">Подключить</a>
-      <a href="${escapeHtml(s.uri)}" class="copy" data-uri="${escapeHtml(s.uri)}">Копировать</a>
+      <a href="${escapeHtml(s.uri)}">Connect</a>
+      <a href="${escapeHtml(s.uri)}" class="copy" data-uri="${escapeHtml(s.uri)}">Copy</a>
     </div>
   </section>`;
   }).join('\n');
   return `<!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Серверы подписки (${servers.length})</title>
+<title>Subscription servers (${servers.length})</title>
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, sans-serif; background: #12161d; color: #dde3ea; margin: 0 auto; padding: 1rem; max-width: 46rem; }
@@ -466,13 +466,13 @@ export function serversHtml(servers) {
 </style>
 </head>
 <body>
-<h1>Серверы подписки (${servers.length})</h1>
+<h1>Subscription servers (${servers.length})</h1>
 ${cards}
 <script>
 document.querySelectorAll('a.copy').forEach(a => a.addEventListener('click', e => {
   e.preventDefault();
   navigator.clipboard.writeText(a.dataset.uri).then(() => {
-    const t = a.textContent; a.textContent = 'Скопировано';
+    const t = a.textContent; a.textContent = 'Copied';
     setTimeout(() => { a.textContent = t; }, 1200);
   });
 }));

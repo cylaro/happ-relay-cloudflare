@@ -304,23 +304,16 @@ export function parseJsonSubscription(text) {
 /**
  * Extract proxy URIs (vless://, vmess://, ss://, …) from a subscription body:
  * Xray/V2Ray JSON config, plain text, base64 text, or a mix. Order is preserved.
- * Duplicate servers (same protocol, address, port and identity — configs often
- * embed the same set twice) are kept once, first occurrence wins.
+ * Each JSON config element is one server entry (like in Happ) — no deduplication,
+ * because different entries may intentionally share the same endpoint.
  */
 export function parseSubscriptionUris(text) {
   const fromJson = parseJsonSubscription(text);
-  if (fromJson.length > 0) {
-    const seen = new Set();
-    return fromJson.filter(uri => {
-      const key = uri.replace(/#.*$/, '');
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
+  if (fromJson.length > 0) return fromJson;
   const body = decodeIfBase64(String(text || '').trim());
   if (!body) return [];
-  return body.split(/\r?\n/).map(l => l.trim()).filter(URI_LINE_RE.test.bind(URI_LINE_RE));
+  const seen = new Set();
+  return body.split(/\r?\n/).map(l => l.trim()).filter(l => URI_LINE_RE.test(l) && !seen.has(l) && seen.add(l));
 }
 
 /** Human-readable name from a proxy URI fragment (#Node), decoded and sanitized. */
@@ -348,17 +341,32 @@ export function listServers(text) {
   }));
 }
 
+/**
+ * Regional-indicator emoji flag ("🇵🇱") -> image URL with the same flag.
+ * Falls back to an empty string when the name has no flag.
+ */
+export function flagImage(name) {
+  const m = String(name).match(/[\u{1F1E6}-\u{1F1FF}][\u{1F1E6}-\u{1F1FF}]/u);
+  if (!m) return '';
+  const code = [...m[0]].map(c => String.fromCharCode(c.codePointAt(0) - 0x1F1E6 + 65)).join('');
+  return `https://flagcdn.com/w40/${code.toLowerCase()}.png`;
+}
+
 /** Minimal HTML page listing every server with its name and copyable link. */
 export function serversHtml(servers) {
-  const cards = servers.map(s => `
+  const cards = servers.map(s => {
+    const flag = flagImage(s.name);
+    const flagHtml = flag ? `<img class="flag" src="${flag}" alt="" width="24" height="18">` : '';
+    return `
   <section class="card">
-    <h2>${escapeHtml(s.index)}. ${escapeHtml(s.name)}</h2>
+    <h2>${flagHtml}<span class="num">${escapeHtml(s.index)}.</span> ${escapeHtml(s.name)}</h2>
     <code>${escapeHtml(s.uri)}</code>
     <div class="actions">
       <a href="${escapeHtml(s.uri)}">Подключить</a>
       <a href="${escapeHtml(s.uri)}" class="copy" data-uri="${escapeHtml(s.uri)}">Копировать</a>
     </div>
-  </section>`).join('\n');
+  </section>`;
+  }).join('\n');
   return `<!doctype html>
 <html lang="ru">
 <head>
@@ -370,7 +378,9 @@ export function serversHtml(servers) {
   body { font-family: system-ui, sans-serif; background: #12161d; color: #dde3ea; margin: 0 auto; padding: 1rem; max-width: 46rem; }
   h1 { font-size: 1.2rem; }
   .card { background: #1a2028; border: 1px solid #2a3340; border-radius: 10px; padding: 0.9rem 1rem; margin: 0.8rem 0; }
-  h2 { font-size: 1rem; margin: 0 0 0.6rem; word-break: break-word; }
+  h2 { font-size: 1rem; margin: 0 0 0.6rem; word-break: break-word; display: flex; align-items: center; gap: 0.5rem; }
+  .flag { border-radius: 3px; flex: none; }
+  .num { color: #8b97a5; }
   code { display: block; font-size: 0.78rem; color: #9fb0c3; background: #12161d; border-radius: 6px; padding: 0.6rem; overflow-wrap: anywhere; }
   .actions { display: flex; gap: 0.8rem; margin-top: 0.6rem; }
   a { color: #6db3f2; }

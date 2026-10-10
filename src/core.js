@@ -445,6 +445,7 @@ export function serversHtml(servers) {
     </div>
   </section>`;
   }).join('\n');
+  const allUris = servers.map(s => s.uri).join('\n');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -454,7 +455,8 @@ export function serversHtml(servers) {
 <style>
   :root { color-scheme: dark; }
   body { font-family: system-ui, sans-serif; background: #12161d; color: #dde3ea; margin: 0 auto; padding: 1rem; max-width: 46rem; }
-  h1 { font-size: 1.2rem; }
+  h1 { font-size: 1.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
+  .export { display: flex; gap: 0.8rem; }
   .card { background: #1a2028; border: 1px solid #2a3340; border-radius: 10px; padding: 0.9rem 1rem; margin: 0.8rem 0; }
   h2 { font-size: 1rem; margin: 0 0 0.6rem; word-break: break-word; display: flex; align-items: center; gap: 0.5rem; }
   .flag { border-radius: 3px; flex: none; }
@@ -462,12 +464,18 @@ export function serversHtml(servers) {
   code { display: block; font-size: 0.78rem; color: #9fb0c3; background: #12161d; border-radius: 6px; padding: 0.6rem; overflow-wrap: anywhere; }
   .actions { display: flex; gap: 0.8rem; margin-top: 0.6rem; }
   a { color: #6db3f2; }
-  a.copy { cursor: pointer; }
+  a.copy, a#export-copy { cursor: pointer; }
 </style>
 </head>
 <body>
-<h1>Subscription servers (${servers.length})</h1>
+<h1>Subscription servers (${servers.length})
+  <span class="export">
+    <a href="#" id="export-copy">Export all (copy)</a>
+    <a href="#" id="export-file">Export all (file)</a>
+  </span>
+</h1>
 ${cards}
+<textarea id="export-data" hidden>${escapeHtml(allUris)}</textarea>
 <script>
 document.querySelectorAll('a.copy').forEach(a => a.addEventListener('click', e => {
   e.preventDefault();
@@ -476,6 +484,22 @@ document.querySelectorAll('a.copy').forEach(a => a.addEventListener('click', e =
     setTimeout(() => { a.textContent = t; }, 1200);
   });
 }));
+document.getElementById('export-copy').addEventListener('click', e => {
+  e.preventDefault();
+  navigator.clipboard.writeText(document.getElementById('export-data').value).then(() => {
+    const a = e.target; const t = a.textContent; a.textContent = 'Copied';
+    setTimeout(() => { a.textContent = t; }, 1200);
+  });
+});
+document.getElementById('export-file').addEventListener('click', e => {
+  e.preventDefault();
+  const blob = new Blob([document.getElementById('export-data').value], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'servers.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
 </script>
 </body>
 </html>`;

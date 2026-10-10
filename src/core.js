@@ -274,10 +274,20 @@ export function parseJsonSubscription(text) {
 /**
  * Extract proxy URIs (vless://, vmess://, ss://, …) from a subscription body:
  * Xray/V2Ray JSON config, plain text, base64 text, or a mix. Order is preserved.
+ * Duplicate servers (same protocol, address, port and identity — configs often
+ * embed the same set twice) are kept once, first occurrence wins.
  */
 export function parseSubscriptionUris(text) {
   const fromJson = parseJsonSubscription(text);
-  if (fromJson.length > 0) return fromJson;
+  if (fromJson.length > 0) {
+    const seen = new Set();
+    return fromJson.filter(uri => {
+      const key = uri.replace(/#.*$/, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
   const body = decodeIfBase64(String(text || '').trim());
   if (!body) return [];
   return body.split(/\r?\n/).map(l => l.trim()).filter(URI_LINE_RE.test.bind(URI_LINE_RE));

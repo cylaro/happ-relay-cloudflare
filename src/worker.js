@@ -4,6 +4,8 @@ import {
   identityHeaders,
   filterResponseHeaders,
   validateEnv,
+  listServers,
+  serversHtml,
 } from './core.js';
 
 function healthResponse(env) {
@@ -47,6 +49,14 @@ export default {
     const declaredLength = Number(upstream.headers.get('content-length') || 0);
     if (declaredLength > MAX_RESPONSE_BYTES) {
       return new Response('upstream response too large', { status: 502 });
+    }
+
+    if (route.route === 'list') {
+      const text = await upstream.text();
+      if (!upstream.ok) return new Response(`upstream error: ${upstream.status}`, { status: 502 });
+      const servers = listServers(text);
+      if (servers.length === 0) return new Response('no proxy URIs found in subscription', { status: 502 });
+      return new Response(serversHtml(servers), { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
     }
 
     return new Response(upstream.body, { status: upstream.status, headers: filterResponseHeaders(upstream.headers) });

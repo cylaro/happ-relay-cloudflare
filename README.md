@@ -124,6 +124,16 @@ https://happ-relay-cloudflare.<your-subdomain>.workers.dev/hX7kQ2mV/s/6f9a2b1c-4
 
 That's it. Update the subscription on every device — the panel still shows one device. Traffic quota display works too (`subscription-userinfo` is forwarded).
 
+#### Per-server link list
+
+To see each subscription link individually (with the server name from its `#fragment`), open the same path with `l/` instead of `s/`:
+
+```
+https://happ-relay-cloudflare.<your-subdomain>.workers.dev/hX7kQ2mV/l/6f9a2b1c-4e7d-4c1a-9b2e-8f5d3a7c1e2f
+```
+
+You get an HTML page listing every server: its name, the full `vless://` link (clickable) and a copy button. Plain-text and Base64 subscriptions are supported; `vless`, `vmess`, `ss`, `trojan`, `socks`, `hysteria2` URIs are recognized.
+
 > **Do not share the relay link publicly** — anyone with it uses your traffic under your identity.
 
 ### Maintenance

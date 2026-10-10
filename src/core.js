@@ -75,6 +75,7 @@ export function safeEqual(a, b) {
  * Route a request path:
  *   /<prefix>/health        -> { route: 'health' }
  *   /<prefix>/s/<token...>  -> { route: 'subscription', tokenPath }
+ *   /<prefix>/l/<token...>  -> { route: 'list', tokenPath }
  *   anything else           -> { route: 'not-found' }
  *
  * tokenPath may be a bare subscription token (resolved against PANEL_BASE)
@@ -84,10 +85,12 @@ export function matchRoute(pathname, env) {
   const prefix = normalizedPrefix(env);
   if (prefix === '/' || pathname.length > 2048 || !env?.SECRET_PREFIX) return { route: 'not-found' };
   if (safeEqual(pathname, `${prefix}/health`)) return { route: 'health' };
-  const subscriptionPrefix = `${prefix}/s/`;
-  if (safeEqual(pathname.slice(0, subscriptionPrefix.length), subscriptionPrefix) && pathname.length > subscriptionPrefix.length) {
-    const tokenPath = pathname.slice(subscriptionPrefix.length).replace(/^\/+/, '');
-    if (tokenPath && !/\s/.test(tokenPath)) return { route: 'subscription', tokenPath };
+  for (const [route, seg] of [['subscription', 's'], ['list', 'l']]) {
+    const routePrefix = `${prefix}/${seg}/`;
+    if (safeEqual(pathname.slice(0, routePrefix.length), routePrefix) && pathname.length > routePrefix.length) {
+      const tokenPath = pathname.slice(routePrefix.length).replace(/^\/+/, '');
+      if (tokenPath && !/\s/.test(tokenPath)) return { route, tokenPath };
+    }
   }
   return { route: 'not-found' };
 }
@@ -134,4 +137,98 @@ export function filterResponseHeaders(upstreamHeaders) {
   }
   headers.set('cache-control', 'no-store');
   return headers;
+}
+
+const URI_LINE_RE = /^(?:vless|vmess|ss|socks|trojan|hysteria2|hy2):\/\//i;
+
+/** Decode a base64 subscription body if it does not already look like plain URIs. */
+function decodeIfBase64(text) {
+  if (URI_LINE_RE.test(text)) return text;
+  try {
+    const binary = atob(text.replace(/\s+/g, ''));
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Extract proxy URIs (vless://, vmess://, ss://, …) from a subscription body:
+ * plain text, base64 text, or a mix of both. Order is preserved.
+ */
+export function parseSubscriptionUris(text) {
+  const body = decodeIfBase64(String(text || '').trim());
+  if (!body) return [];
+  return body.split(/\r?\n/).map(l => l.trim()).filter(URI_LINE_RE.test.bind(URI_LINE_RE));
+}
+
+/** Human-readable name from a proxy URI fragment (#Node), decoded and sanitized. */
+export function uriName(uri) {
+  const m = String(uri).match(/#([^#?]*)$/);
+  if (!m) return '';
+  try {
+    return decodeURIComponent(m[1]).replace(/[\r\n\t<>&"]/g, ' ').trim();
+  } catch {
+    return m[1].replace(/[\r\n\t<>&"]/g, ' ').trim();
+  }
+}
+
+/** Escape a string for safe interpolation into HTML text/attributes. */
+export function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+/** One entry per server: index (1-based), display name, proxy URI. */
+export function listServers(text) {
+  return parseSubscriptionUris(text).map((uri, i) => ({
+    index: i + 1,
+    name: uriName(uri) || `Server ${i + 1}`,
+    uri,
+  }));
+}
+
+/** Minimal HTML page listing every server with its name and copyable link. */
+export function serversHtml(servers) {
+  const cards = servers.map(s => `
+  <section class="card">
+    <h2>${escapeHtml(s.index)}. ${escapeHtml(s.name)}</h2>
+    <code>${escapeHtml(s.uri)}</code>
+    <div class="actions">
+      <a href="${escapeHtml(s.uri)}">Подключить</a>
+      <a href="${escapeHtml(s.uri)}" class="copy" data-uri="${escapeHtml(s.uri)}">Копировать</a>
+    </div>
+  </section>`).join('\n');
+  return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Серверы подписки (${servers.length})</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; background: #12161d; color: #dde3ea; margin: 0 auto; padding: 1rem; max-width: 46rem; }
+  h1 { font-size: 1.2rem; }
+  .card { background: #1a2028; border: 1px solid #2a3340; border-radius: 10px; padding: 0.9rem 1rem; margin: 0.8rem 0; }
+  h2 { font-size: 1rem; margin: 0 0 0.6rem; word-break: break-word; }
+  code { display: block; font-size: 0.78rem; color: #9fb0c3; background: #12161d; border-radius: 6px; padding: 0.6rem; overflow-wrap: anywhere; }
+  .actions { display: flex; gap: 0.8rem; margin-top: 0.6rem; }
+  a { color: #6db3f2; }
+  a.copy { cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>Серверы подписки (${servers.length})</h1>
+${cards}
+<script>
+document.querySelectorAll('a.copy').forEach(a => a.addEventListener('click', e => {
+  e.preventDefault();
+  navigator.clipboard.writeText(a.dataset.uri).then(() => {
+    const t = a.textContent; a.textContent = 'Скопировано';
+    setTimeout(() => { a.textContent = t; }, 1200);
+  });
+}));
+</script>
+</body>
+</html>`;
 }

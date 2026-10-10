@@ -129,39 +129,55 @@ test('parseSubscriptionUris: base64 body is decoded', () => {
   assert.deepEqual(parseSubscriptionUris(encoded), ['vless://a#One', 'vless://b#Two']);
 });
 
-const XRAY_CONFIG = JSON.stringify({
-  outbounds: [
-    {
-      tag: 'cfg',
-      protocol: 'vless',
-      settings: { vnext: [{ address: '1.2.3.4', port: 22846, users: [{ id: 'uuid-1', encryption: 'none', flow: 'xtls-rprx-vision' }] }] },
-      streamSettings: {
-        network: 'tcp',
-        security: 'reality',
-        realitySettings: { serverName: 'yahoo.com', fingerprint: 'chrome', publicKey: 'pbk-x', shortId: 'sid-x' },
+const XRAY_CONFIG = JSON.stringify([
+  {
+    remarks: '🇵🇱 8 | Польша',
+    outbounds: [
+      {
+        tag: 'proxy',
+        protocol: 'vless',
+        settings: { vnext: [{ address: 'pl11k.example.icu', port: 8825, users: [{ id: 'uuid-1', encryption: 'none', flow: 'xtls-rprx-vision' }] }] },
+        streamSettings: { network: 'tcp', security: 'reality', realitySettings: { serverName: 'yahoo.com', fingerprint: 'chrome', publicKey: 'pbk-x', shortId: 'sid-x' } },
       },
-    },
-    {
-      tag: 'hy2 out',
-      protocol: 'hysteria2',
-      settings: { servers: [{ address: 'hy.example.com', port: 8443 }] },
-      streamSettings: { network: 'tcp', security: 'tls', tlsSettings: { serverName: 'hy.example.com' } },
-    },
-    { tag: 'blocked', protocol: 'blackhole', settings: {} },
-  ],
-});
+      { tag: 'block', protocol: 'blackhole' },
+      { tag: 'direct', protocol: 'freedom' },
+    ],
+  },
+  {
+    remarks: '🇩🇪 13 | Германия',
+    outbounds: [
+      {
+        tag: 'proxy',
+        protocol: 'hysteria',
+        settings: { address: 'de4d.example.icu', port: 8825, version: 2 },
+        streamSettings: { network: 'hysteria', hysteriaSettings: { version: 2, auth: 'auth-uuid' }, security: 'tls', tlsSettings: { serverName: 'de4d.example.icu' } },
+      },
+      { tag: 'direct', protocol: 'freedom' },
+    ],
+  },
+]);
 
-test('parseSubscriptionUris: Xray JSON config is converted to URIs', () => {
+test('parseSubscriptionUris: Happ-style Xray config array -> one URI per element, named by remarks', () => {
   const uris = parseSubscriptionUris(XRAY_CONFIG);
   assert.equal(uris.length, 2);
-  assert.match(uris[0], /^vless:\/\/uuid-1@1\.2\.3\.4:22846\?/);
-  assert.match(uris[0], /type=tcp/);
+  assert.match(uris[0], /^vless:\/\/uuid-1@pl11k\.example\.icu:8825\?/);
   assert.match(uris[0], /security=reality/);
   assert.match(uris[0], /sni=yahoo\.com/);
-  assert.match(uris[0], /pbk=pbk-x/);
-  assert.match(uris[0], /flow=xtls-rprx-vision/);
-  assert.match(uris[0], /#cfg$/);
-  assert.match(uris[1], /^hysteria2:\/\/hy\.example\.com:8443\?.*sni=hy\.example\.com.*#hy2%20out$/);
+  assert.equal(uriName(uris[0]), '🇵🇱 8 | Польша');
+  assert.equal(uriName(uris[1]), '🇩🇪 13 | Германия');
+});
+
+test('parseSubscriptionUris: loopback placeholder outbounds (127.0.0.1) are skipped', () => {
+  const cfg = JSON.stringify([{
+    remarks: 'x',
+    outbounds: [
+      { tag: 'proxy', protocol: 'vless', settings: { vnext: [{ address: '127.0.0.1', port: 5555, users: [{ id: 'u' }] }] } },
+      { tag: 'proxy-2', protocol: 'vless', settings: { vnext: [{ address: 'real.example.com', port: 443, users: [{ id: 'u2' }] }] } },
+    ],
+  }]);
+  const uris = parseSubscriptionUris(cfg);
+  assert.equal(uris.length, 1);
+  assert.match(uris[0], /real\.example\.com/);
 });
 
 test('outboundToUri: vmess outbound becomes base64 JSON link; non-server outbound yields null', () => {

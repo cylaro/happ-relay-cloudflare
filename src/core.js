@@ -154,7 +154,7 @@ function decodeIfBase64(text) {
   }
 }
 
-/** Recursively collect every outbounds[] entry from parsed JSON (Xray/V2Ray config, possibly wrapped). */
+/** Recursively collect outbounds[] entries from parsed JSON (used only for unit tests of outboundToUri). */
 function collectOutbounds(node, acc) {
   if (!node || typeof node !== 'object') return acc;
   if (Array.isArray(node)) {
@@ -170,7 +170,28 @@ function collectOutbounds(node, acc) {
 
 function firstServer(outbound) {
   const s = outbound?.settings || {};
-  return s.vnext?.[0] || s.servers?.[0] || null;
+  return s.vnext?.[0] || s.servers?.[0] || (s.address && s.port ? { address: s.address, port: s.port } : null) || null;
+}
+
+const SERVICE_TAGS = new Set(['block', 'direct', 'dns-out', 'api', 'socks']);
+
+function isLoopback(server) {
+  const a = String(server?.address || '');
+  return a === '127.0.0.1' || a === '::1' || a === 'localhost';
+}
+
+/**
+ * Pick the primary proxy outbound of one Xray config element.
+ * Happ-style configs carry one entry per config; its tag is usually "proxy",
+ * the rest are service outbounds (block/direct/dns) or loopback placeholders.
+ */
+function primaryOutbound(config) {
+  const obs = (Array.isArray(config?.outbounds) ? config.outbounds : [])
+    .filter(o => o && typeof o === 'object' && PROTOCOLS.has(String(o.protocol || '').toLowerCase()) && !SERVICE_TAGS.has(String(o.tag || '').toLowerCase()));
+  if (obs.length === 0) return null;
+  const real = obs.filter(o => !isLoopback(firstServer(o)));
+  if (real.length === 0) return null;
+  return real.find(o => o.tag === 'proxy') || real[0];
 }
 
 /** Build query params from streamSettings (security, transport, reality/tls details). */
@@ -202,11 +223,11 @@ function streamParams(stream) {
 }
 
 /** Convert one Xray/V2Ray outbound into a shareable proxy URI, or null if not representable. */
-export function outboundToUri(outbound) {
+export function outboundToUri(outbound, remark = '') {
   const protocol = String(outbound?.protocol || '').toLowerCase();
   const server = firstServer(outbound);
   if (!server || !server.address || !server.port) return null;
-  const tag = String(outbound.tag || '').replace(/[\r\n\t#?/&]/g, ' ').trim() || 'server';
+  const tag = String(remark || outbound.tag || '').replace(/[\r\n\t#?/&]/g, ' ').trim() || 'server';
   const name = encodeURIComponent(tag);
   const addr = String(server.address);
   const port = Number(server.port);
@@ -268,7 +289,16 @@ export function parseJsonSubscription(text) {
       return [];
     }
   }
-  return collectOutbounds(parsed, []).map(outboundToUri).filter(Boolean);
+  const configs = Array.isArray(parsed) ? parsed : [parsed];
+  const uris = [];
+  for (const config of configs) {
+    const remark = String(config?.remarks || '').replace(/[\r\n#?]/g, ' ').trim();
+    const outbound = primaryOutbound(config);
+    if (!outbound) continue;
+    const uri = outboundToUri(outbound, remark);
+    if (uri) uris.push(uri);
+  }
+  return uris;
 }
 
 /**

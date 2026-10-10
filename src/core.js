@@ -142,6 +142,13 @@ export function filterResponseHeaders(upstreamHeaders) {
 const URI_LINE_RE = /^(?:vless|vmess|ss|socks|trojan|hysteria2|hy2|hysteria):\/\//i;
 const PROTOCOLS = new Set(['vless', 'vmess', 'trojan', 'ss', 'socks', 'hysteria', 'hysteria2', 'hy2']);
 
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
 /** Decode a base64 subscription body if it does not already look like plain URIs. */
 function decodeIfBase64(text) {
   if (URI_LINE_RE.test(text)) return text;
@@ -152,20 +159,6 @@ function decodeIfBase64(text) {
   } catch {
     return text;
   }
-}
-
-/** Recursively collect outbounds[] entries from parsed JSON (used only for unit tests of outboundToUri). */
-function collectOutbounds(node, acc) {
-  if (!node || typeof node !== 'object') return acc;
-  if (Array.isArray(node)) {
-    for (const item of node) collectOutbounds(item, acc);
-    return acc;
-  }
-  if (Array.isArray(node.outbounds)) {
-    for (const o of node.outbounds) if (o && typeof o === 'object' && PROTOCOLS.has(String(o.protocol || '').toLowerCase())) acc.push(o);
-  }
-  for (const v of Object.values(node)) collectOutbounds(v, acc);
-  return acc;
 }
 
 function firstServer(outbound) {
@@ -181,9 +174,9 @@ function isLoopback(server) {
 }
 
 /**
- * Pick the primary proxy outbound of one Xray config element.
- * Happ-style configs carry one entry per config; its tag is usually "proxy",
- * the rest are service outbounds (block/direct/dns) or loopback placeholders.
+ * Pick the primary proxy outbound of one Xray config element (XTLS JSON
+ * subscription: each array element is one connection, primary outbound is
+ * usually tagged "proxy"; the rest are service outbounds or loopback hops).
  */
 function primaryOutbound(config) {
   const obs = (Array.isArray(config?.outbounds) ? config.outbounds : [])
@@ -194,32 +187,106 @@ function primaryOutbound(config) {
   return real.find(o => o.tag === 'proxy') || real[0];
 }
 
-/** Build query params from streamSettings (security, transport, reality/tls details). */
+/** Bracket IPv6 literals so they are valid inside a URI authority. */
+function hostPart(address) {
+  const a = String(address);
+  return a.includes(':') ? `[${a}]` : a;
+}
+
+const hostOf = h => (Array.isArray(h) ? h.join(',') : String(h));
+
+/** Build the query string from streamSettings per the Xray share-link spec. */
 function streamParams(stream) {
   const params = new URLSearchParams();
-  const network = String(stream?.network || 'tcp');
+  let network = String(stream?.network || 'tcp');
+  if (network === 'raw') network = 'tcp';
+  if (network === 'splithttp') network = 'xhttp';
   params.set('type', network);
+
   const security = String(stream?.security || '');
   if (security === 'tls' || security === 'reality') {
-    const conf = stream?.[security + 'Settings'] || {};
+    // Two config shapes exist: flat (realitySettings.publicKey) and nested
+    // (realitySettings.settings.publicKey + shortIds[] arrays, as used by panels).
+    const raw = stream?.[security + 'Settings'] || {};
+    const conf = raw.settings && typeof raw.settings === 'object' ? { ...raw, ...raw.settings } : raw;
     params.set('security', security);
-    if (conf.serverName) params.set('sni', conf.serverName);
+    const sni = conf.serverName || (Array.isArray(conf.serverNames) ? conf.serverNames[0] : '');
+    if (sni) params.set('sni', sni);
     if (conf.fingerprint) params.set('fp', conf.fingerprint);
     if (conf.alpn) params.set('alpn', Array.isArray(conf.alpn) ? conf.alpn.join(',') : conf.alpn);
-    if (conf.publicKey) params.set('pbk', conf.publicKey);
-    if (conf.shortId) params.set('sid', conf.shortId);
-    if (conf.spiderX) params.set('spx', conf.spiderX);
     if (conf.allowInsecure) params.set('allowInsecure', '1');
+    if (security === 'reality') {
+      if (conf.publicKey) params.set('pbk', conf.publicKey);
+      const sid = Array.isArray(conf.shortIds) ? conf.shortIds[0] : conf.shortId;
+      if (sid) params.set('sid', sid);
+      if (conf.spiderX) params.set('spx', conf.spiderX);
+      if (conf.mldsa65Verify) params.set('pqv', conf.mldsa65Verify);
+    } else {
+      if (conf.echConfigList) params.set('ech', conf.echConfigList);
+      if (conf.verifyPeerCertByName) params.set('vcn', conf.verifyPeerCertByName);
+      if (conf.pinnedPeerCertSha256) params.set('pcs', Array.isArray(conf.pinnedPeerCertSha256) ? conf.pinnedPeerCertSha256.join(',') : conf.pinnedPeerCertSha256);
+    }
+  } else if (security && security !== 'none') {
+    params.set('security', security);
   }
-  const hostOf = h => (Array.isArray(h) ? h.join(',') : String(h));
-  if (network === 'ws' && stream?.wsSettings) {
+
+  if (network === 'tcp' && stream?.tcpSettings?.header) {
+    const header = stream.tcpSettings.header;
+    if (header.type && header.type !== 'none') {
+      params.set('headerType', header.type);
+      if (header.type === 'http' && header.request) {
+        if (header.request.path) params.set('path', hostOf(header.request.path));
+        const host = header.request.headers?.Host ?? header.request.headers?.host;
+        if (host) params.set('host', hostOf(host));
+      }
+    }
+  } else if (network === 'ws' && stream?.wsSettings) {
     if (stream.wsSettings.path) params.set('path', stream.wsSettings.path);
-    if (stream.wsSettings.headers?.Host) params.set('host', hostOf(stream.wsSettings.headers.Host));
+    const host = stream.wsSettings.host ?? stream.wsSettings.headers?.Host ?? stream.wsSettings.headers?.host;
+    if (host) params.set('host', hostOf(host));
+  } else if (network === 'httpupgrade' && stream?.httpupgradeSettings) {
+    if (stream.httpupgradeSettings.path) params.set('path', stream.httpupgradeSettings.path);
+    const host = stream.httpupgradeSettings.host ?? stream.httpupgradeSettings.headers?.Host;
+    if (host) params.set('host', hostOf(host));
+  } else if (network === 'grpc' && stream?.grpcSettings) {
+    if (stream.grpcSettings.serviceName) params.set('serviceName', stream.grpcSettings.serviceName);
+    if (stream.grpcSettings.authority) params.set('authority', stream.grpcSettings.authority);
+    if (stream.grpcSettings.multiMode) params.set('mode', 'multi');
+    if (stream.grpcSettings.userAgent) params.set('userAgent', stream.grpcSettings.userAgent);
+  } else if (network === 'kcp' && stream?.kcpSettings) {
+    const kcp = stream.kcpSettings;
+    if (kcp.header?.type && kcp.header.type !== 'none') params.set('headerType', kcp.header.type);
+    if (kcp.seed) params.set('seed', kcp.seed);
+    if (kcp.mtu) params.set('mtu', String(kcp.mtu));
+    if (kcp.tti) params.set('tti', String(kcp.tti));
+  } else if (network === 'xhttp' && stream?.xhttpSettings) {
+    const x = stream.xhttpSettings;
+    if (x.path) params.set('path', x.path);
+    if (x.host) params.set('host', x.host);
+    if (x.mode) params.set('mode', x.mode);
+    if (x.extra && typeof x.extra === 'object') params.set('extra', JSON.stringify(x.extra));
+  } else if (network === 'quic' && stream?.quicSettings) {
+    const q = stream.quicSettings;
+    if (q.security) params.set('quicSecurity', q.security);
+    if (q.key) params.set('key', q.key);
+    if (q.header?.type) params.set('headerType', q.header.type);
+  } else if (network === 'hysteria' && stream?.hysteriaSettings) {
+    if (stream.hysteriaSettings.version) params.set('version', String(stream.hysteriaSettings.version));
   }
-  if (network === 'grpc' && stream?.grpcSettings?.serviceName) params.set('serviceName', stream.grpcSettings.serviceName);
-  if (network === 'tcp' && stream?.tcpSettings?.header?.request?.headers?.Host) params.set('host', hostOf(stream.tcpSettings.header.request.headers.Host));
-  if (network === 'http' && stream?.tcpSettings?.header?.request?.path) params.set('path', hostOf(stream.tcpSettings.header.request.path));
   return params;
+}
+
+/** Hysteria2 obfs params from xray finalmask (salamander/gecko). */
+function finalmaskParams(stream, params) {
+  const masks = stream?.finalmask?.udp;
+  if (!Array.isArray(masks)) return;
+  for (const m of masks) {
+    if (m?.type === 'salamander' || m?.type === 'gecko') {
+      params.set('obfs', m.type);
+      if (m.settings?.password) params.set('obfs-password', m.settings.password);
+      break;
+    }
+  }
 }
 
 /** Convert one Xray/V2Ray outbound into a shareable proxy URI, or null if not representable. */
@@ -227,47 +294,57 @@ export function outboundToUri(outbound, remark = '') {
   const protocol = String(outbound?.protocol || '').toLowerCase();
   const server = firstServer(outbound);
   if (!server || !server.address || !server.port) return null;
-  const tag = String(remark || outbound.tag || '').replace(/[\r\n\t#?/&]/g, ' ').trim() || 'server';
-  const name = encodeURIComponent(tag);
-  const addr = String(server.address);
-  const port = Number(server.port);
+  const name = encodeURIComponent(String(remark || outbound.tag || '').replace(/[\r\n\t#?/&]/g, ' ').trim() || 'server');
+  const addr = hostPart(server.address);
   const params = streamParams(outbound.streamSettings);
   const user = server.users?.[0] || {};
+  const security = String(outbound.streamSettings?.security || '');
 
   if (protocol === 'vless' && user.id) {
-    if (user.encryption && user.encryption !== 'none') params.set('encryption', user.encryption);
+    params.set('encryption', user.encryption || 'none');
     if (user.flow) params.set('flow', user.flow);
-    return `vless://${encodeURIComponent(user.id)}@${addr}:${port}?${params}#${name}`;
+    return `vless://${encodeURIComponent(user.id)}@${addr}:${server.port}?${params}#${name}`;
   }
   if (protocol === 'vmess' && user.id) {
+    const network = String(outbound.streamSettings?.network || 'tcp').replace('raw', 'tcp');
     const vm = {
-      v: '2', ps: tag, add: addr, port: String(port), id: user.id,
+      v: '2', ps: String(remark || outbound.tag || 'server'), add: String(server.address), port: String(server.port), id: user.id,
       aid: String(user.alterId ?? 0), scy: user.security || 'auto',
-      net: String(outbound.streamSettings?.network || 'tcp'), type: 'none',
+      net: network, type: outbound.streamSettings?.kcpSettings?.header?.type || 'none',
       host: params.get('host') || '', path: params.get('path') || '',
-      tls: params.get('security') === 'tls' ? 'tls' : '',
-      sni: params.get('sni') || '', fp: params.get('fp') || '',
+      tls: security === 'tls' ? 'tls' : security === 'reality' ? 'reality' : '',
+      sni: params.get('sni') || '', fp: params.get('fp') || '', alpn: params.get('alpn') || '',
     };
-    return `vmess://${btoa(JSON.stringify(vm))}`;
+    return `vmess://${b64encode(JSON.stringify(vm))}`;
   }
   if (protocol === 'trojan' && server.password) {
-    return `trojan://${encodeURIComponent(server.password)}@${addr}:${port}?${params}#${name}`;
+    if (security === '') params.set('security', 'none');
+    return `trojan://${encodeURIComponent(server.password)}@${addr}:${server.port}?${params}#${name}`;
   }
   if (protocol === 'ss' && server.method && server.password) {
-    return `ss://${btoa(`${server.method}:${server.password}`)}@${addr}:${port}#${name}`;
+    // SIP002: plain userinfo (method:password percent-encoded) is valid for every cipher,
+    // unlike websafe-base64 which is forbidden for AEAD-2022.
+    const userinfo = `${encodeURIComponent(server.method)}:${encodeURIComponent(server.password)}`;
+    return `ss://${userinfo}@${addr}:${server.port}#${name}`;
   }
   if (protocol === 'socks') {
     const u = user.user ? `${encodeURIComponent(user.user)}:${encodeURIComponent(user.pass || '')}@` : '';
-    return `socks://${u}${addr}:${port}#${name}`;
+    return `socks://${u}${addr}:${server.port}#${name}`;
   }
-  if ((protocol === 'hysteria2' || protocol === 'hy2')) {
-    const pass = encodeURIComponent(outbound.settings?.password || server.password || '');
-    return `hysteria2://${pass ? pass + '@' : ''}${addr}:${port}?${params}#${name}`;
+  if (protocol === 'hysteria2' || protocol === 'hy2') {
+    const auth = outbound.settings?.password || server.password || user.id || '';
+    finalmaskParams(outbound.streamSettings, params);
+    const authPart = auth ? `${encodeURIComponent(auth)}@` : '';
+    return `hysteria2://${authPart}${addr}:${server.port}?${params}#${name}`;
   }
   if (protocol === 'hysteria') {
-    const auth = server.password || outbound.settings?.auth_str || '';
-    if (auth) params.set('auth', auth);
-    return `hysteria://${addr}:${port}?${params}#${name}`;
+    // Xray's hysteria outbound is Hysteria2-compatible (auth + TLS + optional obfs).
+    const auth = outbound.streamSettings?.hysteriaSettings?.auth || server.password || outbound.settings?.password || outbound.settings?.auth_str || '';
+    finalmaskParams(outbound.streamSettings, params);
+    if (params.get('security') === 'tls') params.delete('security');
+    params.delete('type');
+    const authPart = auth ? `${encodeURIComponent(auth)}@` : '';
+    return `hysteria2://${authPart}${addr}:${server.port}?${params}#${name}`;
   }
   return null;
 }
@@ -292,7 +369,8 @@ export function parseJsonSubscription(text) {
   const configs = Array.isArray(parsed) ? parsed : [parsed];
   const uris = [];
   for (const config of configs) {
-    const remark = String(config?.remarks || '').replace(/[\r\n#?]/g, ' ').trim();
+    if (!config || typeof config !== 'object' || !Array.isArray(config.outbounds)) continue;
+    const remark = String(config.remarks || '').replace(/[\r\n#?]/g, ' ').trim();
     const outbound = primaryOutbound(config);
     if (!outbound) continue;
     const uri = outboundToUri(outbound, remark);
